@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Isaac Sim build output (expected at repo root by launch scripts)
+_build/
+
+# MolmoAct2 inference server (cloned/downloaded at runtime)
+molmoact2/
+models/
+*.pt
+*.safetensors
+*.bin
+*.ckpt
+
+# Logs and temp files
+*.log
+logs/
+tmp/
+temp/
+.cache/
+*.tmp
+*.bak
+*.swp
+*~
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.suo
+*.user
+
+# Omniverse / Isaac Sim runtime
+kit/logs/
+.nvidia-omniverse/
+omni.log

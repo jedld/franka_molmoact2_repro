@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Isaac Sim Franka + MolmoAct2</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --panel: #171a22;
+      --panel-2: #1e2330;
+      --border: #2a3142;
+      --text: #e8ecf4;
+      --muted: #8b95a8;
+      --accent: #4f8cff;
+      --accent-2: #36c98b;
+      --danger: #ff6b6b;
+      --warn: #ffb347;
+      --radius: 12px;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at top, #1a2030 0%, var(--bg) 55%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(15, 17, 23, 0.85);
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--warn);
+      box-shadow: 0 0 10px rgba(255, 179, 71, 0.5);
+    }
+    .dot.ok { background: var(--accent-2); box-shadow: 0 0 10px rgba(54, 201, 139, 0.5); }
+    .dot.err { background: var(--danger); box-shadow: 0 0 10px rgba(255, 107, 107, 0.5); }
+
+    main {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      padding: 20px 24px 32px;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 1100px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    .header-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      padding: 8px 14px;
+      border: 1px solid rgba(79, 140, 255, 0.45);
+      border-radius: 8px;
+      background: rgba(79, 140, 255, 0.1);
+    }
+
+    .header-link:hover {
+      background: rgba(79, 140, 255, 0.18);
+    }
+
+    #molmoact2-panel {
+      scroll-margin-top: 80px;
+      border-color: rgba(79, 140, 255, 0.35);
+    }
+
+    #molmoact2-panel .panel-header {
+      background: rgba(79, 140, 255, 0.08);
+    }
+
+    .molmo-layout {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 18px;
+    }
+
+    @media (max-width: 900px) {
+      .molmo-layout { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-body { padding: 16px 18px 18px; }
+
+    .camera-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+
+    .camera-card {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .camera-card img {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      display: block;
+      background: #05070c;
+    }
+
+    .camera-label {
+      padding: 8px 10px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .tab.active {
+      background: rgba(79, 140, 255, 0.15);
+      border-color: rgba(79, 140, 255, 0.45);
+      color: var(--text);
+    }
+
+    .section { display: none; }
+    .section.active { display: block; }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    input[type="number"], input[type="range"] {
+      width: 100%;
+    }
+
+    input[type="number"] {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+    }
+
+    .nudge-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 12px 0 16px;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: 0.15s ease;
+    }
+    button:hover { border-color: rgba(79, 140, 255, 0.5); background: rgba(79, 140, 255, 0.08); }
+    button.primary {
+      background: linear-gradient(180deg, #5b94ff 0%, #3f79ea 100%);
+      border-color: #5b94ff;
+      color: white;
+    }
+    button.success {
+      background: linear-gradient(180deg, #43d89a 0%, #2fb67d 100%);
+      border-color: #43d89a;
+      color: #062016;
+    }
+    button.danger {
+      background: linear-gradient(180deg, #ff7d7d 0%, #ea5757 100%);
+      border-color: #ff7d7d;
+      color: white;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .state-box {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .metric {
+      background: rgba(0, 0, 0, 0.22);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .metric .name { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
+    .metric .value { font-size: 1rem; font-variant-numeric: tabular-nums; }
+
+    .joint-row {
+      display: grid;
+      grid-template-columns: 72px 1fr 72px;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .log {
+      margin-top: 14px;
+      min-height: 72px;
+      max-height: 120px;
+      overflow: auto;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      white-space: pre-wrap;
+    }
+
+    .hint {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 8px;
+      line-height: 1.45;
+    }
+
+    .quick-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .quick-actions button {
+      font-size: 0.88rem;
+      padding: 9px 14px;
+    }
+
+    button.home {
+      background: linear-gradient(180deg, #7c6cff 0%, #5a4fd9 100%);
+      border-color: #7c6cff;
+      color: white;
+    }
+
+    .subsection-title {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 14px 0 8px;
+    }
+
+    .joint-metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .joint-metrics .metric .value { font-size: 0.88rem; }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 10px 0 14px;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .checkbox-row input { width: auto; }
+
+    textarea, select {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      font-family: inherit;
+    }
+
+    textarea { min-height: 72px; resize: vertical; }
+
+    .molmo-status {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .molmo-status .metric .value { font-size: 0.88rem; }
+
+    .task-presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .task-presets button {
+      font-size: 0.78rem;
+      padding: 6px 10px;
+    }
+
+    .running-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: rgba(54, 201, 139, 0.15);
+      color: var(--accent-2);
+      border: 1px solid rgba(54, 201, 139, 0.35);
+    }
+
+    .running-badge.idle {
+      background: rgba(139, 149, 168, 0.12);
+      color: var(--muted);
+      border-color: var(--border);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Isaac Sim Franka + MolmoAct2</h1>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <a class="header-link" href="#molmoact2-panel">MolmoAct2 Inference ↓</a>
+      <div class="status">
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText">Connecting…</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="main-grid">
+    <section class="panel">
+      <div class="panel-header">
+        <span>Camera Feeds</span>
+        <button id="refreshCamerasBtn" type="button">Refresh</button>
+      </div>
+      <div class="panel-body">
+        <div class="camera-grid" id="cameraGrid"></div>
+        <p class="hint">Live RGB preview (lazy JPEG, does not affect MolmoAct2 15 Hz policy capture).</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <span>Robot Control</span>
+        <button id="refreshStateBtn" type="button">Sync State</button>
+      </div>
+      <div class="panel-body">
+        <div class="state-box" id="stateBox"></div>
+        <div class="joint-metrics" id="jointBox"></div>
+
+        <div class="quick-actions">
+          <button class="home" id="quickHomeBtn" type="button" title="moveToJointPose — canonical home">Go Home</button>
+          <button id="quickDroidBtn" type="button" title="moveToJointPose — DROID ready pose">DROID Ready</button>
+          <button class="success" id="quickOpenBtn" type="button" title="openGripper">Open Gripper</button>
+          <button class="danger" id="quickCloseBtn" type="button" title="closeGripper">Close Gripper</button>
+          <button id="quickInitBtn" type="button" title="Home + open gripper (startup sequence)">Initialize</button>
+          <button id="readStateBtn" type="button" title="readState">Read EE Pose</button>
+          <button id="readJointsBtn" type="button" title="readJointState">Read Joints</button>
+        </div>
+
+        <div class="tabs">
+          <button class="tab active" data-tab="cartesian" type="button">Cartesian</button>
+          <button class="tab" data-tab="joints" type="button">Joints</button>
+          <button class="tab" data-tab="gripper" type="button">Gripper</button>
+        </div>
+
+        <div class="section active" id="cartesianSection">
+          <p class="subsection-title">Target pose — edit X/Y/Z below, then Move to Pose</p>
+          <div class="field-grid">
+            <div>
+              <label for="xInput">Target X (m)</label>
+              <input id="xInput" type="number" step="0.001" />
+            </div>
+            <div>
+              <label for="yInput">Target Y (m)</label>
+              <input id="yInput" type="number" step="0.001" />
+            </div>
+            <div>
+              <label for="zInput">Target Z (m)</label>
+              <input id="zInput" type="number" step="0.001" />
+            </div>
+          </div>
+
+          <label for="stepInput">Nudge step (m)</label>
+          <input id="stepInput" type="number" step="0.005" value="0.02" style="margin-bottom: 10px;" />
+
+          <div class="nudge-grid">
+            <button type="button" data-nudge="x-" id="nudgeXMinus">X −</button>
+            <button type="button" data-nudge="y+" id="nudgeYPlus">Y +</button>
+            <button type="button" data-nudge="x+" id="nudgeXPlus">X +</button>
+            <button type="button" data-nudge="z+" id="nudgeZPlus">Z +</button>
+            <button type="button" data-nudge="y-" id="nudgeYMinus">Y −</button>
+            <button type="button" data-nudge="z-" id="nudgeZMinus">Z −</button>
+          </div>
+
+          <div class="field-grid">
+            <div>
+              <label for="tfInput">Motion time (s)</label>
+              <input id="tfInput" type="number" step="0.5" value="5" min="5" />
+            </div>
+            <div>
+              <label for="dAlpha">Δα (deg)</label>
+              <input id="dAlpha" type="number" step="1" value="0" />
+            </div>
+            <div>
+              <label for="dBeta">Δβ (deg)</label>
+              <input id="dBeta" type="number" step="1" value="0" />
+            </div>
+            <div>
+              <label for="dGamma">Δγ (deg)</label>
+              <input id="dGamma" type="number" step="1" value="0" />
+            </div>
+          </div>
+
+          <div class="checkbox-row">
+            <input id="nudgeAndMove" type="checkbox" />
+            <label for="nudgeAndMove" style="margin:0;text-transform:none;letter-spacing:0;">Move immediately after nudge</label>
+          </div>
+
+          <div class="actions">
+            <button class="primary" id="moveCartesianBtn" type="button">Move to Pose</button>
+            <button id="readPoseBtn" type="button">Copy Current EE to Targets</button>
+            <button id="cartesianHomeBtn" type="button">Go Home (joints)</button>
+          </div>
+          <p class="hint">moveToCartesian — position in robot base frame (m). Optional Δα/Δβ/Δγ are relative rotations in degrees.</p>
+        </div>
+
+        <div class="section" id="jointsSection">
+          <p class="subsection-title">moveToJointPose — absolute joint targets (rad)</p>
+          <div id="jointSliders"></div>
+          <div class="field-grid" style="grid-template-columns: 1fr 1fr;">
+            <div>
+              <label for="jointTfInput">Motion time (s)</label>
+              <input id="jointTfInput" type="number" step="0.5" value="5" min="5" />
+            </div>
+            <div>
+              <label for="homeTfInput">Home motion time (s)</label>
+              <input id="homeTfInput" type="number" step="0.5" value="10" min="5" />
+            </div>
+          </div>
+          <div class="actions">
+            <button class="primary" id="moveJointsBtn" type="button">Move Joints</button>
+            <button class="home" id="homeBtn" type="button">Go Home</button>
+            <button id="droidPoseBtn" type="button">DROID Ready</button>
+            <button id="loadJointsBtn" type="button">Load from Robot</button>
+          </div>
+        </div>
+
+        <div class="section" id="gripperSection">
+          <p class="subsection-title">closeGripper / openGripper</p>
+          <p class="hint">Empty closeGripper payload defaults to 1 cm grasp width (same as the real motion server GUI).</p>
+          <div class="actions">
+            <button class="success" id="closeGripperBtn" type="button">Close Gripper</button>
+            <button class="danger" id="openGripperBtn" type="button">Open Gripper</button>
+            <button id="closeDefaultBtn" type="button">Close (default width)</button>
+          </div>
+          <div style="margin-top: 14px;">
+            <label for="graspWidth">Grasp width (m)</label>
+            <input id="graspWidth" type="number" step="0.005" value="0.01" min="0" max="0.08" />
+          </div>
+          <div style="margin-top: 14px;">
+            <label for="openSpeed">Open speed (optional, m/s)</label>
+            <input id="openSpeed" type="number" step="0.01" value="0.1" min="0.01" max="1" />
+          </div>
+        </div>
+
+        <div class="log" id="log"></div>
+      </div>
+    </section>
+    </div>
+
+    <section class="panel" id="molmoact2-panel">
+      <div class="panel-header">
+        <span>MolmoAct2-DROID Inference</span>
+        <span class="running-badge idle" id="molmoRunningBadge">Idle</span>
+      </div>
+      <div class="panel-body">
+        <p class="hint">
+          Enter a language prompt below and click <strong>Start Inference</strong>. The server sends live
+          camera frames + joint state to the MolmoAct2 GPU host at 15 Hz and drives the Franka from the
+          returned action chunk. See <code>start_molmoact2_3090.md</code>: single exterior uses
+          <code>POST /act</code> on port <strong>8012</strong>; dual or duplicate exterior uses
+          <code>POST /act_dual</code> on port <strong>8101</strong> (<code>MOLMOACT2_DUAL_EXTERIOR=1</code>).
+        </p>
+
+        <div class="molmo-layout">
+          <div>
+            <div style="margin-bottom: 12px;">
+              <label for="molmoUrl">Inference server URL</label>
+              <input id="molmoUrl" type="text" value="http://192.168.0.233:8012" />
+            </div>
+
+            <div style="margin-bottom: 12px;">
+              <label for="molmoCameraMode">Exterior cameras for policy</label>
+              <select id="molmoCameraMode">
+                <option value="single">Single exterior — POST /act (:8012)</option>
+                <option value="dual">Both exteriors — POST /act_dual (:8101)</option>
+                <option value="duplicate">Duplicate one exterior — POST /act_dual (:8101)</option>
+              </select>
+            </div>
+
+            <div style="margin-bottom: 12px;" id="molmoExternalSlotWrap">
+              <label for="molmoExternal">Which exterior (single / duplicate modes)</label>
+              <select id="molmoExternal">
+                <option value="external_1">Exterior 1 (left)</option>
+                <option value="external_2">Exterior 2 (front)</option>
+              </select>
+            </div>
+
+            <div style="margin-bottom: 8px;">
+              <label for="molmoInstruction">Language instruction (prompt)</label>
+              <textarea id="molmoInstruction" placeholder="Pick up the apple and place it on the plate"></textarea>
+            </div>
+
+            <p class="subsection-title" style="margin-top:0;">Task presets</p>
+            <div class="task-presets" id="molmoTaskPresets"></div>
+
+            <div class="actions">
+              <button class="primary" id="molmoStartBtn" type="button">Start Inference</button>
+              <button class="danger" id="molmoStopBtn" type="button">Stop</button>
+              <button id="molmoHealthBtn" type="button">Check Server Health</button>
+              <button id="molmoDroidReadyBtn" type="button">DROID Ready First</button>
+            </div>
+          </div>
+
+          <div>
+            <p class="subsection-title" style="margin-top:0;">Status</p>
+            <div class="molmo-status" id="molmoStatusBox"></div>
+            <p class="hint" id="molmoHelpHint">
+              Requires Isaac motion server with cameras (do not use <code>--no-cameras</code>).
+              Inference host must respond on <code>/healthz</code> before starting.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Canonical home — matches motion_server.cpp goHomeJoints
+    const HOME_JOINTS = [0, -0.785398, 0, -2.35619, 0, 1.5708, 0.785398];
+    // DROID / Isaac Sim default ready pose
+    const DROID_JOINTS = [0, -1.3, 0, -2.87, 0, 2.0, 0.75];
+    const JOINT_NAMES = ["J1", "J2", "J3", "J4", "J5", "J6", "J7"];
+
+    const state = {
+      measuredCartesian: [0, 0, 0, 0, 0, 0],
+      measuredJoints: HOME_JOINTS.slice(),
+      jointTargets: HOME_JOINTS.slice(),
+      busy: false,
+      cameras: [],
+      molmoRunning: false,
+      molmoTasks: {},
+    };
+
+    const els = {
+      statusDot: document.getElementById("statusDot"),
+      statusText: document.getElementById("statusText"),
+      cameraGrid: document.getElementById("cameraGrid"),
+      stateBox: document.getElementById("stateBox"),
+      jointBox: document.getElementById("jointBox"),
+      log: document.getElementById("log"),
+      xInput: document.getElementById("xInput"),
+      yInput: document.getElementById("yInput"),
+      zInput: document.getElementById("zInput"),
+      stepInput: document.getElementById("stepInput"),
+      tfInput: document.getElementById("tfInput"),
+      jointTfInput: document.getElementById("jointTfInput"),
+      homeTfInput: document.getElementById("homeTfInput"),
+      dAlpha: document.getElementById("dAlpha"),
+      dBeta: document.getElementById("dBeta"),
+      dGamma: document.getElementById("dGamma"),
+      nudgeAndMove: document.getElementById("nudgeAndMove"),
+      jointSliders: document.getElementById("jointSliders"),
+      molmoUrl: document.getElementById("molmoUrl"),
+      molmoCameraMode: document.getElementById("molmoCameraMode"),
+      molmoExternal: document.getElementById("molmoExternal"),
+      molmoExternalSlotWrap: document.getElementById("molmoExternalSlotWrap"),
+      molmoInstruction: document.getElementById("molmoInstruction"),
+      molmoTaskPresets: document.getElementById("molmoTaskPresets"),
+      molmoStatusBox: document.getElementById("molmoStatusBox"),
+      molmoRunningBadge: document.getElementById("molmoRunningBadge"),
+    };
+
+    function log(message, isError = false) {
+      const prefix = new Date().toLocaleTimeString();
+      els.log.textContent = `[${prefix}] ${message}\n` + els.log.textContent;
+      if (isError) {
+        els.statusDot.className = "dot err";
+        els.statusText.textContent = "Error";
+      }
+    }
+
+    function setBusy(busy) {
+      state.busy = busy;
+      document.querySelectorAll("button").forEach((btn) => {
+        if (btn.id === "refreshCamerasBtn" || btn.id === "refreshStateBtn") return;
+        if (state.molmoRunning && btn.id === "molmoStopBtn") return;
+        btn.disabled = busy;
+      });
+      if (busy) {
+        els.statusDot.className = "dot";
+        els.statusText.textContent = "Moving…";
+      }
+    }
+
+    async function motionPost(body) {
+      const response = await fetch("/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const text = await response.text();
+      let payload;
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        payload = text;
+      }
+      if (!response.ok) {
+        const msg = typeof payload === "string" ? payload : JSON.stringify(payload);
+        throw new Error(msg.replace(/^"|"$/g, ""));
+      }
+      return payload;
+    }
+
+    function renderMeasuredState() {
+      const [x, y, z, a, b, g] = state.measuredCartesian;
+      const metrics = [
+        ["X", x.toFixed(3) + " m"],
+        ["Y", y.toFixed(3) + " m"],
+        ["Z", z.toFixed(3) + " m"],
+        ["α (Z)", a.toFixed(1) + "°"],
+        ["β (Y)", b.toFixed(1) + "°"],
+        ["γ (X)", g.toFixed(1) + "°"],
+      ];
+      els.stateBox.innerHTML = metrics.map(([name, value]) => `
+        <div class="metric"><div class="name">${name}</div><div class="value">${value}</div></div>
+      `).join("");
+
+      els.jointBox.innerHTML = JOINT_NAMES.map((name, i) => `
+        <div class="metric">
+          <div class="name">${name}</div>
+          <div class="value">${state.measuredJoints[i].toFixed(3)} rad</div>
+        </div>
+      `).join("");
+    }
+
+    /** Copy current measured EE position into the editable target fields. */
+    function syncCartesianTargetsFromMeasured() {
+      const [x, y, z] = state.measuredCartesian;
+      els.xInput.value = x.toFixed(3);
+      els.yInput.value = y.toFixed(3);
+      els.zInput.value = z.toFixed(3);
+    }
+
+    function readCartesianTargets() {
+      return [
+        Number(els.xInput.value),
+        Number(els.yInput.value),
+        Number(els.zInput.value),
+      ];
+    }
+
+    async function readStateOnly(quiet = false) {
+      if (!quiet) setBusy(true);
+      try {
+        const payload = await motionPost({ readState: [] });
+        if (payload.readState) state.measuredCartesian = payload.readState;
+        renderMeasuredState();
+        if (!quiet) log(`EE pose: [${state.measuredCartesian.map(v => v.toFixed(3)).join(", ")}]`);
+        markConnected();
+      } catch (err) {
+        log(`readState failed: ${err.message}`, true);
+      } finally {
+        if (!quiet) setBusy(false);
+      }
+    }
+
+    async function readJointsOnly(quiet = false, updateSliders = true) {
+      if (!quiet) setBusy(true);
+      try {
+        const payload = await motionPost({ readJointState: [] });
+        if (payload.readJointState) {
+          state.measuredJoints = payload.readJointState;
+          if (updateSliders) state.jointTargets = payload.readJointState.slice();
+        }
+        renderMeasuredState();
+        if (updateSliders) buildJointSliders();
+        if (!quiet) log(`Joint state: [${state.measuredJoints.map(v => v.toFixed(3)).join(", ")}]`);
+        markConnected();
+      } catch (err) {
+        log(`readJointState failed: ${err.message}`, true);
+      } finally {
+        if (!quiet) setBusy(false);
+      }
+    }
+
+    function markConnected() {
+      els.statusDot.className = "dot ok";
+      els.statusText.textContent = "Connected";
+    }
+
+    function buildJointSliders() {
+      els.jointSliders.innerHTML = JOINT_NAMES.map((name, i) => `
+        <div class="joint-row">
+          <label>${name}</label>
+          <input type="range" min="-3.14" max="3.14" step="0.01" value="${state.jointTargets[i]}" data-joint="${i}" />
+          <input type="number" step="0.01" value="${state.jointTargets[i].toFixed(3)}" data-joint-input="${i}" />
+        </div>
+      `).join("");
+
+      els.jointSliders.querySelectorAll("[data-joint]").forEach((slider) => {
+        slider.addEventListener("input", (e) => {
+          const idx = Number(e.target.dataset.joint);
+          const val = Number(e.target.value);
+          state.jointTargets[idx] = val;
+          els.jointSliders.querySelector(`[data-joint-input="${idx}"]`).value = val.toFixed(3);
+        });
+      });
+
+      els.jointSliders.querySelectorAll("[data-joint-input]").forEach((input) => {
+        input.addEventListener("change", (e) => {
+          const idx = Number(e.target.dataset.jointInput);
+          const val = Number(e.target.value);
+          state.jointTargets[idx] = val;
+          els.jointSliders.querySelector(`[data-joint="${idx}"]`).value = val;
+        });
+      });
+    }
+
+    async function refreshState(updateTargets = false) {
+      try {
+        const payload = await motionPost({ readState: [], readJointState: [] });
+        if (payload.readState) state.measuredCartesian = payload.readState;
+        if (payload.readJointState) {
+          state.measuredJoints = payload.readJointState;
+          if (updateTargets) state.jointTargets = payload.readJointState.slice();
+        }
+        renderMeasuredState();
+        if (updateTargets) {
+          syncCartesianTargetsFromMeasured();
+          buildJointSliders();
+        }
+        markConnected();
+      } catch (err) {
+        log(`State sync failed: ${err.message}`, true);
+      }
+    }
+
+    async function loadCameras() {
+      try {
+        const response = await fetch("/api/cameras");
+        state.cameras = await response.json();
+        renderCameras();
+      } catch (err) {
+        log(`Camera list failed: ${err.message}`, true);
+      }
+    }
+
+    function renderCameras() {
+      if (!state.cameras.length) {
+        els.cameraGrid.innerHTML = `<div class="hint">No cameras reported by the server.</div>`;
+        return;
+      }
+      els.cameraGrid.innerHTML = state.cameras.map((cam) => `
+        <article class="camera-card">
+          <img src="/api/camera/${cam.id}.jpg?t=${Date.now()}" alt="${cam.label}" data-camera="${cam.id}" />
+          <div class="camera-label">${cam.label}</div>
+        </article>
+      `).join("");
+    }
+
+    let cameraRefreshInFlight = false;
+
+    async function refreshCameraImages() {
+      const imgs = [...els.cameraGrid.querySelectorAll("img[data-camera]")];
+      if (!imgs.length || cameraRefreshInFlight) return;
+      cameraRefreshInFlight = true;
+      try {
+        await Promise.all(imgs.map(async (img) => {
+          const id = img.dataset.camera;
+          try {
+            const resp = await fetch(`/api/camera/${id}.jpg?t=${Date.now()}`);
+            if (!resp.ok) return;
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const prev = img.dataset.blobUrl;
+            img.src = url;
+            if (prev) URL.revokeObjectURL(prev);
+            img.dataset.blobUrl = url;
+          } catch {
+            // ignore transient fetch errors
+          }
+        }));
+      } finally {
+        cameraRefreshInFlight = false;
+      }
+    }
+
+    async function moveCartesian() {
+      const [x, y, z] = readCartesianTargets();
+      if ([x, y, z].some((v) => Number.isNaN(v))) {
+        log("Enter valid numeric targets for X, Y, and Z.", true);
+        return;
+      }
+
+      setBusy(true);
+      try {
+        const payload = [x, y, z, Number(els.tfInput.value)];
+        const dA = Number(els.dAlpha.value);
+        const dB = Number(els.dBeta.value);
+        const dG = Number(els.dGamma.value);
+        if (dA !== 0 || dB !== 0 || dG !== 0) {
+          payload.push(dA, dB, dG);
+        }
+        const result = await motionPost({ moveToCartesian: payload });
+        state.measuredCartesian = result.moveToCartesian;
+        renderMeasuredState();
+        log(`moveToCartesian → [${state.measuredCartesian.slice(0, 3).map(v => v.toFixed(3)).join(", ")}]`);
+        markConnected();
+      } catch (err) {
+        log(`moveToCartesian failed: ${err.message}`, true);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function moveJoints(targetJoints, tfOverride) {
+      setBusy(true);
+      const tf = tfOverride ?? Number(els.jointTfInput.value);
+      try {
+        const result = await motionPost({ moveToJointPose: targetJoints.concat([tf]) });
+        state.measuredJoints = result.moveToJointPose;
+        state.jointTargets = result.moveToJointPose.slice();
+        buildJointSliders();
+        await readStateOnly(true);
+        renderMeasuredState();
+        log(`moveToJointPose complete (tf=${tf}s).`);
+        markConnected();
+      } catch (err) {
+        log(`moveToJointPose failed: ${err.message}`, true);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function goHome() {
+      await moveJoints(HOME_JOINTS, Number(els.homeTfInput.value));
+    }
+
+    async function goDroidReady() {
+      await moveJoints(DROID_JOINTS, Number(els.jointTfInput.value));
+    }
+
+    async function initializeRobot() {
+      setBusy(true);
+      try {
+        const tf = Number(els.homeTfInput.value);
+        const result = await motionPost({
+          moveToJointPose: HOME_JOINTS.concat([tf]),
+          openGripper: [],
+        });
+        if (result.moveToJointPose) {
+          state.measuredJoints = result.moveToJointPose;
+          state.jointTargets = result.moveToJointPose.slice();
+        }
+        buildJointSliders();
+        await refreshState(false);
+        log(result.openGripper || "Initialize complete.");
+        markConnected();
+      } catch (err) {
+        log(`Initialize failed: ${err.message}`, true);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function gripper(action, options = {}) {
+      setBusy(true);
+      try {
+        let body;
+        if (action === "close") {
+          body = { closeGripper: options.defaultWidth ? [] : [Number(document.getElementById("graspWidth").value)] };
+        } else {
+          const speed = Number(document.getElementById("openSpeed").value);
+          body = { openGripper: options.withSpeed ? [speed] : [] };
+        }
+        const result = await motionPost(body);
+        const msg = result.closeGripper || result.openGripper;
+        log(msg);
+        markConnected();
+      } catch (err) {
+        log(`Gripper command failed: ${err.message}`, true);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function copyCurrentPoseToTargets() {
+      await readStateOnly(true);
+      syncCartesianTargetsFromMeasured();
+      log("Copied current EE position into target X/Y/Z fields.");
+    }
+
+    function nudge(axis, direction) {
+      const step = Number(els.stepInput.value) || 0.02;
+      const map = { x: els.xInput, y: els.yInput, z: els.zInput };
+      const input = map[axis];
+      input.value = (Number(input.value) + direction * step).toFixed(3);
+      if (els.nudgeAndMove.checked) {
+        moveCartesian();
+      }
+    }
+
+    async function molmoApi(path, body) {
+      const response = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || JSON.stringify(payload));
+      }
+      return payload;
+    }
+
+    function molmoConfigBody() {
+      return {
+        server_url: els.molmoUrl.value.trim(),
+        instruction: els.molmoInstruction.value.trim(),
+        external_slot: els.molmoExternal.value,
+        external_camera_mode: els.molmoCameraMode.value,
+      };
+    }
+
+    function updateMolmoExternalSlotVisibility() {
+      const dual = els.molmoCameraMode.value === "dual";
+      els.molmoExternalSlotWrap.style.display = dual ? "none" : "block";
+    }
+
+    function updateMolmoUrlForCameraMode() {
+      const mode = els.molmoCameraMode.value;
+      const url = els.molmoUrl.value.trim();
+      const match = url.match(/^(https?:\/\/[^:]+):(\d+)\/?$/);
+      if (!match) return;
+      const base = match[1];
+      const port = match[2];
+      if (mode === "single" && port === "8101") {
+        els.molmoUrl.value = `${base}:8012`;
+      } else if ((mode === "dual" || mode === "duplicate") && port === "8012") {
+        els.molmoUrl.value = `${base}:8101`;
+      }
+    }
+
+    function renderMolmoStatus(status) {
+      if (!status || !status.configured) {
+        els.molmoStatusBox.innerHTML = `
+          <div class="hint" style="grid-column: 1 / -1; color: var(--danger); border: 1px solid var(--danger); padding: 10px; border-radius: 8px;">
+            MolmoAct2 is not active on this server. Restart with cameras enabled:
+            <code>launch_isaac_motion_server.bat --spawn-robot</code>
+            (do not use <code>--no-cameras</code> or <code>--no-ui</code>).
+          </div>`;
+        return;
+      }
+      state.molmoRunning = !!status.running;
+      els.molmoRunningBadge.textContent = status.running ? "Running" : "Idle";
+      els.molmoRunningBadge.className = "running-badge" + (status.running ? "" : " idle");
+
+      const health = status.inference_healthy;
+      const healthText = health === null ? "unknown" : (health ? "ok" : "down");
+      const metrics = [
+        ["Server", status.server_url || "—"],
+        ["Endpoint", status.last_endpoint || "—"],
+        ["Exterior mode", status.external_camera_mode || "single"],
+        ["Exterior slot", status.external_slot || "external_1"],
+        ["Inference health", healthText],
+        ["Chunk", `${status.action_idx || 0} / ${status.chunk_size || 0}`],
+        ["Chunks fetched", String(status.chunks_fetched || 0)],
+        ["Steps applied", String(status.steps_applied || 0)],
+        ["Fetching", status.fetching ? "yes" : "no"],
+        ["Last fetch (s)", status.last_fetch_s != null ? status.last_fetch_s.toFixed(2) : "—"],
+        ["Last dt_ms", status.last_dt_ms != null ? String(status.last_dt_ms) : "—"],
+      ];
+      els.molmoStatusBox.innerHTML = metrics.map(([name, value]) => `
+        <div class="metric"><div class="name">${name}</div><div class="value">${value}</div></div>
+      `).join("");
+      if (status.last_error) {
+        els.molmoStatusBox.innerHTML += `<div class="hint" style="grid-column: 1 / -1; color: var(--danger);">${status.last_error}</div>`;
+      }
+    }
+
+    async function refreshMolmoStatus(quiet = false) {
+      try {
+        const response = await fetch("/api/molmoact2/status");
+        const status = await response.json();
+        renderMolmoStatus(status);
+      } catch (err) {
+        if (!quiet) log(`MolmoAct2 status failed: ${err.message}`, true);
+      }
+    }
+
+    async function loadMolmoTasks() {
+      try {
+        const response = await fetch("/api/molmoact2/tasks");
+        state.molmoTasks = await response.json();
+        els.molmoTaskPresets.innerHTML = Object.entries(state.molmoTasks).map(([key, text]) => `
+          <button type="button" data-molmo-task="${key}">${key.replace(/_/g, " ")}</button>
+        `).join("");
+        els.molmoTaskPresets.querySelectorAll("[data-molmo-task]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            els.molmoInstruction.value = state.molmoTasks[btn.dataset.molmoTask] || "";
+          });
+        });
+        if (!els.molmoInstruction.value && state.molmoTasks.apple_on_plate) {
+          els.molmoInstruction.value = state.molmoTasks.apple_on_plate;
+        }
+      } catch (err) {
+        log(`Could not load MolmoAct2 task presets: ${err.message}`, true);
+      }
+    }
+
+    async function checkMolmoHealth() {
+      try {
+        const result = await fetch("/api/molmoact2/health").then((r) => r.json());
+        const msg = result.ok ? `Inference server healthy (${result.body || "ok"})` : `Unhealthy: ${result.body || result.status}`;
+        log(msg, !result.ok);
+        await refreshMolmoStatus(true);
+      } catch (err) {
+        log(`Health check failed: ${err.message}`, true);
+      }
+    }
+
+    async function startMolmoInference() {
+      const instruction = els.molmoInstruction.value.trim();
+      if (!instruction) {
+        log("Enter a language instruction before starting MolmoAct2.", true);
+        return;
+      }
+      try {
+        await molmoApi("/api/molmoact2/configure", molmoConfigBody());
+        const status = await molmoApi("/api/molmoact2/start", {});
+        renderMolmoStatus(status);
+        log(`MolmoAct2 inference started: "${instruction}"`);
+      } catch (err) {
+        log(`Start inference failed: ${err.message}`, true);
+      }
+    }
+
+    async function stopMolmoInference() {
+      try {
+        const status = await molmoApi("/api/molmoact2/stop", {});
+        renderMolmoStatus(status);
+        log("MolmoAct2 inference stopped.");
+      } catch (err) {
+        log(`Stop inference failed: ${err.message}`, true);
+      }
+    }
+
+    async function molmoDroidReadyThenStart() {
+      await goDroidReady();
+      await startMolmoInference();
+    }
+
+    document.querySelectorAll(".tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+        document.querySelectorAll(".section").forEach((s) => s.classList.remove("active"));
+        tab.classList.add("active");
+        document.getElementById(`${tab.dataset.tab}Section`).classList.add("active");
+      });
+    });
+
+    document.querySelectorAll("[data-nudge]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const [axis, sign] = [btn.dataset.nudge[0], btn.dataset.nudge[1] === "+" ? 1 : -1];
+        nudge(axis, sign);
+      });
+    });
+
+    document.getElementById("moveCartesianBtn").addEventListener("click", moveCartesian);
+    document.getElementById("readPoseBtn").addEventListener("click", copyCurrentPoseToTargets);
+    document.getElementById("cartesianHomeBtn").addEventListener("click", goHome);
+    document.getElementById("moveJointsBtn").addEventListener("click", () => moveJoints(state.jointTargets.slice()));
+    document.getElementById("homeBtn").addEventListener("click", goHome);
+    document.getElementById("droidPoseBtn").addEventListener("click", goDroidReady);
+    document.getElementById("loadJointsBtn").addEventListener("click", readJointsOnly);
+    document.getElementById("closeGripperBtn").addEventListener("click", () => gripper("close"));
+    document.getElementById("closeDefaultBtn").addEventListener("click", () => gripper("close", { defaultWidth: true }));
+    document.getElementById("openGripperBtn").addEventListener("click", () => gripper("open", { withSpeed: true }));
+    document.getElementById("quickHomeBtn").addEventListener("click", goHome);
+    document.getElementById("quickDroidBtn").addEventListener("click", goDroidReady);
+    document.getElementById("quickOpenBtn").addEventListener("click", () => gripper("open"));
+    document.getElementById("quickCloseBtn").addEventListener("click", () => gripper("close", { defaultWidth: true }));
+    document.getElementById("quickInitBtn").addEventListener("click", initializeRobot);
+    document.getElementById("readStateBtn").addEventListener("click", readStateOnly);
+    document.getElementById("readJointsBtn").addEventListener("click", readJointsOnly);
+    document.getElementById("refreshStateBtn").addEventListener("click", () => refreshState(false));
+    document.getElementById("refreshCamerasBtn").addEventListener("click", () => {
+      loadCameras();
+      refreshCameraImages();
+    });
+
+    document.getElementById("molmoStartBtn").addEventListener("click", startMolmoInference);
+    document.getElementById("molmoStopBtn").addEventListener("click", stopMolmoInference);
+    document.getElementById("molmoHealthBtn").addEventListener("click", checkMolmoHealth);
+    document.getElementById("molmoDroidReadyBtn").addEventListener("click", molmoDroidReadyThenStart);
+    els.molmoCameraMode.addEventListener("change", () => {
+      updateMolmoExternalSlotVisibility();
+      updateMolmoUrlForCameraMode();
+    });
+    updateMolmoExternalSlotVisibility();
+
+    buildJointSliders();
+    loadCameras().then(() => refreshState(true));
+    loadMolmoTasks().then(() => refreshMolmoStatus(true));
+    if (window.location.hash === "#molmoact2-panel") {
+      document.getElementById("molmoact2-panel")?.scrollIntoView({ behavior: "smooth" });
+    }
+    setInterval(refreshCameraImages, 250);
+    setInterval(() => refreshState(false), 5000);
+    setInterval(() => refreshMolmoStatus(true), 1000);
+  </script>
+</body>
+</html>
