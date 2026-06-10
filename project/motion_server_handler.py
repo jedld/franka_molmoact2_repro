@@ -452,6 +452,25 @@ class IsaacMotionServerHandler:
         with self._mutex:
             return self._current_arm_q().tolist()
 
+    def read_gripper_state(self) -> list[float]:
+        with self._mutex:
+            fingers = self._current_gripper_q()
+            return [float(fingers[0] + fingers[1])]
+
+    def set_joint_pose(self, numbers: list[float]) -> list[float]:
+        """Immediate joint targets for MolmoAct2 policy steps (no cubic trajectory)."""
+        with self._mutex:
+            if len(numbers) < 7:
+                raise RuntimeError("setJointPose requires at least 7 joint angles (rad).")
+            q_target = np.array(numbers[:7], dtype=np.float32)
+            if not self._is_valid_joint_pose(q_target.astype(np.float64)):
+                raise RuntimeError("Joint target outside Franka joint limits.")
+            self._set_arm_targets(q_target.astype(np.float64))
+            if len(numbers) >= 8:
+                self._set_gripper_targets(float(numbers[7]))
+            self._step()
+            return self._current_arm_q().tolist()
+
     def get_joint_positions_q9(self) -> np.ndarray:
         """Return 9-DOF joint vector (7 arm + 2 finger joints) for policy observation."""
         with self._mutex:
@@ -459,6 +478,7 @@ class IsaacMotionServerHandler:
 
     def apply_policy_joint_targets(self, q9: np.ndarray) -> None:
         """Apply absolute joint targets from MolmoAct2 (single sim step, no trajectory)."""
-        with self._mutex:
-            q = np.asarray(q9, dtype=np.float32).reshape(9)
-            self._robot.set_dof_position_targets(q.reshape(1, 9), dof_indices=list(range(9)))
+        q = np.asarray(q9, dtype=np.float64).reshape(9)
+        cmd: list[float] = q[:7].tolist()
+        cmd.append(float((q[7] + q[8]) / 2.0))
+        self.set_joint_pose(cmd)

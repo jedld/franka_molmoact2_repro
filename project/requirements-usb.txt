@@ -1,0 +1,8 @@
+# USB camera stack for hardware_molmoact2_runner.py and --usb-cameras
+opencv-python>=4.8
+numpy>=1.24
+# RealSense wrist camera (optional if wrist uses V4L2 /dev/video* instead)
+pyrealsense2>=2.54
+# MolmoAct2 HTTP client wire format
+json-numpy>=2.0
+requests>=2.28

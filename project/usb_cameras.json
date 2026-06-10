@@ -1,0 +1,20 @@
+{
+  "wrist": {
+    "device": "realsense",
+    "width": 640,
+    "height": 480,
+    "fps": 30
+  },
+  "external_1": {
+    "device": "0",
+    "width": 1280,
+    "height": 720,
+    "fps": 15
+  },
+  "external_2": {
+    "device": "1",
+    "width": 1280,
+    "height": 720,
+    "fps": 15
+  }
+}

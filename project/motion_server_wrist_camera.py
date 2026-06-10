@@ -14,6 +14,8 @@ from dataclasses import dataclass
 
 from pxr import Gf, Sdf, Usd, UsdGeom
 
+from motion_server_gripper import get_gripper_center_z_offset_hand
+
 # Intel RealSense D435 color stream @ 640×480 (ROS camera_info from Isaac camera_ros example).
 # source/standalone_examples/deprecated/api/isaacsim.sensors.camera/camera_ros.py
 REALSENSE_D435_NATIVE_WIDTH = 640
@@ -136,6 +138,9 @@ def compute_wrist_camera_local_pose(
     hand_rot = hand_world.ExtractRotation()
 
     gripper_center, used_fingers = _gripper_center_local(stage, hand_path)
+    tip_offset_z = get_gripper_center_z_offset_hand()
+    if tip_offset_z != 0.0:
+        gripper_center = gripper_center + Gf.Vec3d(0.0, 0.0, tip_offset_z)
     # Behind gripper: −hand Z from finger-base center (toward palm / wrist).
     local_translation = gripper_center + Gf.Vec3d(-0.0668, 0.0, -behind_distance_m)
 

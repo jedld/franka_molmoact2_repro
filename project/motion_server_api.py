@@ -328,6 +328,10 @@ class MotionRestServer:
                 response[key] = self._handler.read_state()
             elif key == "readJointState":
                 response[key] = self._handler.read_joint_state()
+            elif key == "readGripperState":
+                response[key] = self._handler.read_gripper_state()
+            elif key == "setJointPose":
+                response[key] = self._handler.set_joint_pose(numbers)
             else:
                 print(f"Invalid command: {key}")
                 response["Response"] = "Invalid command."

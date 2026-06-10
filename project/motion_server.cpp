@@ -347,6 +347,62 @@ public:
         return final_q;
     }
 
+    // setJointPose: immediate joint command for high-rate VLA loops (MolmoAct2 @ 15 Hz).
+    // Accepts 7 arm joints (rad); optional 8th element sets gripper width (m).
+    // Unlike moveToJointPose, does not run a multi-second cubic trajectory.
+    std::vector<double> setJointPose(const std::vector<float> &numbers) {
+        std::lock_guard<std::mutex> lock(robot_mutex);
+        std::vector<double> final_q(7, 0.0);
+        if (numbers.size() < 7) {
+            throw std::runtime_error("setJointPose requires at least 7 joint angles (rad).");
+        }
+        std::array<double, 7> q_target{};
+        for (int i = 0; i < 7; ++i) {
+            q_target[i] = static_cast<double>(numbers[i]);
+        }
+        if (!isValidJointPose(q_target)) {
+            throw std::runtime_error("Joint target outside Franka joint limits.");
+        }
+        try {
+            robot.control(
+                [q_target](const franka::RobotState&, franka::Duration) -> franka::JointPositions {
+                    franka::JointPositions output(q_target);
+                    return franka::MotionFinished(output);
+                });
+        } catch (const franka::Exception &ex) {
+            try {
+                robot.automaticErrorRecovery();
+            } catch (const franka::Exception &re) {
+                throw std::runtime_error(
+                    std::string("collision_recovery_failed: original=") + ex.what() +
+                    " recovery=" + re.what());
+            }
+            throw std::runtime_error(std::string("collision_recovery: ") + ex.what());
+        }
+        franka::RobotState st = robot.readOnce();
+        for (int i = 0; i < 7; ++i) {
+            final_q[i] = st.q[i];
+        }
+        if (numbers.size() >= 8) {
+            double width = static_cast<double>(numbers[7]);
+            if (width < 0.0) {
+                width = 0.0;
+            }
+            try {
+                gripper.move(width, 0.2);
+            } catch (const franka::Exception &e) {
+                std::cerr << "[setJointPose] gripper.move skipped: " << e.what() << std::endl;
+            }
+        }
+        return final_q;
+    }
+
+    std::vector<double> readGripperState() {
+        std::lock_guard<std::mutex> lock(robot_mutex);
+        franka::GripperState gs = gripper.readOnce();
+        return {gs.width};
+    }
+
     // moveToCartesian accepts three float numbers in a vector
     std::vector<double> moveToCartesian(const std::vector<float> &numbers)
     {
@@ -719,6 +775,14 @@ private:
                         std::vector<double> q = robotHandler.readJointState();
                         for (int i = 0; i < 7; ++i) {
                             response[key][i] = json::value::number(q[i]);
+                        }
+                    } else if (key == "readGripperState") {
+                        std::vector<double> width = robotHandler.readGripperState();
+                        response[key][0] = json::value::number(width[0]);
+                    } else if (key == "setJointPose") {
+                        std::vector<double> final_q = robotHandler.setJointPose(numbers);
+                        for (int i = 0; i < 7; ++i) {
+                            response[key][i] = json::value::number(final_q[i]);
                         }
                     } else {
                         std::cout << "Invalid command: " << key << std::endl;

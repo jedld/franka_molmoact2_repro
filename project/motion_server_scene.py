@@ -17,6 +17,7 @@ from isaacsim.core.experimental.prims import GeomPrim, RigidPrim
 from pxr import Gf, Sdf, Usd, UsdGeom
 
 from motion_server_cameras import CAMERA_HEIGHT, CAMERA_WIDTH, CameraSpec
+from motion_server_gripper import apply_long_finger_mod
 from motion_server_wrist_camera import (
     configure_realsense_d435_prim,
     compute_wrist_camera_local_pose,
@@ -392,6 +393,7 @@ def load_franka_on_desk(assets_root: str, franka_path: str = DEFAULT_FRANKA_PATH
     robot = stage.GetPrimAtPath(franka_path)
     robot.GetVariantSet("Gripper").SetVariantSelection("AlternateFinger")
     robot.GetVariantSet("Mesh").SetVariantSelection("Quality")
+    apply_long_finger_mod(stage, franka_path)
 
 
 def _pull_back_eye(

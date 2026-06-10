@@ -3,6 +3,10 @@ MolmoAct2 inference Server
 
 Authoritative API reference: `start_molmoact2_3090.md` (3090 launcher + HTTP contract).
 
+USB cameras (RealSense wrist + V4L2 exterior on the control PC): configure `usb_cameras.json`
+or `MOLMO_USB_*` env vars; run `hardware_molmoact2_runner.py` with `motion_server.cpp`, or
+Isaac Sim with `--usb-cameras`. See repo `README.md` § USB cameras.
+
 Server ready when startup warmup completes.
 
 | Mode | Port | Endpoint | Image fields |

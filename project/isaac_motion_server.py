@@ -56,6 +56,16 @@ parser.add_argument("--test", action="store_true", help="Exit after a short smok
 parser.add_argument("--no-ui", action="store_true", help="Disable web UI (motion API only)")
 parser.add_argument("--no-cameras", action="store_true", help="Do not spawn or capture simulation cameras")
 parser.add_argument(
+    "--usb-cameras",
+    action="store_true",
+    help="Use USB RealSense/V4L2 cameras instead of Isaac Sim rendered cameras",
+)
+parser.add_argument(
+    "--usb-config",
+    default=None,
+    help="Path to usb_cameras.json (default: project/usb_cameras.json or MOLMO_USB_CONFIG)",
+)
+parser.add_argument(
     "--molmoact2-url",
     default="http://192.168.0.233:8012",
     help="MolmoAct2 inference server base URL (default: http://192.168.0.233:8012)",
@@ -78,6 +88,7 @@ from isaacsim.storage.native import get_assets_root_path
 
 from motion_server_api import MotionRestServer
 from motion_server_cameras import CameraStreamManager, POLICY_CAPTURE_HZ, discover_stage_cameras
+from motion_server_usb_cameras import UsbCameraStreamManager, load_usb_camera_config
 from motion_server_handler import IsaacMotionServerHandler
 from motion_server_molmoact2 import MolmoAct2Controller, TASK_INSTRUCTIONS
 from motion_server_scene import DEFAULT_FRANKA_PATH, SCENE_CAMERA_TARGET, spawn_droid_scene, setup_droid_cameras
@@ -129,18 +140,27 @@ def main() -> None:
 
     camera_manager = None
     if not args.no_cameras:
-        if spawn:
-            camera_specs = setup_droid_cameras(args.robot_path)
-        else:
-            camera_specs = discover_stage_cameras()
-            if not camera_specs:
-                camera_specs = setup_droid_cameras(args.robot_path)
-        if camera_specs:
-            camera_manager = CameraStreamManager(camera_specs)
-            simulation_app.update()
+        if args.usb_cameras:
+            usb_config = load_usb_camera_config(args.usb_config)
+            camera_manager = UsbCameraStreamManager(usb_config)
             camera_manager.initialize()
-            camera_manager.capture()  # seed RGB cache before the main loop
-            print(f"Cameras: {', '.join(s.camera_id for s in camera_specs)} (policy @ {POLICY_CAPTURE_HZ} Hz)")
+            print(
+                f"USB cameras: {', '.join(s.camera_id for s in camera_manager.specs)} "
+                f"(policy @ {POLICY_CAPTURE_HZ} Hz, background capture)"
+            )
+        else:
+            if spawn:
+                camera_specs = setup_droid_cameras(args.robot_path)
+            else:
+                camera_specs = discover_stage_cameras()
+                if not camera_specs:
+                    camera_specs = setup_droid_cameras(args.robot_path)
+            if camera_specs:
+                camera_manager = CameraStreamManager(camera_specs)
+                simulation_app.update()
+                camera_manager.initialize()
+                camera_manager.capture()  # seed RGB cache before the main loop
+                print(f"Sim cameras: {', '.join(s.camera_id for s in camera_specs)} (policy @ {POLICY_CAPTURE_HZ} Hz)")
 
     handler = IsaacMotionServerHandler(args.robot_path, step_fn=simulation_app.update)
 
@@ -191,6 +211,8 @@ def main() -> None:
             break
 
     api.stop()
+    if isinstance(camera_manager, UsbCameraStreamManager):
+        camera_manager.shutdown()
     app_utils.stop()
     simulation_app.close()
 

@@ -18,15 +18,28 @@ import json
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 import numpy as np
 from numpy.lib.format import descr_to_dtype, dtype_to_descr
 
-from motion_server_cameras import CameraStreamManager, MOLMOACT2_POLICY_SHAPE, prepare_molmoact2_image
-from motion_server_handler import IsaacMotionServerHandler
+from motion_server_cameras import MOLMOACT2_POLICY_SHAPE, prepare_molmoact2_image
 
 DEFAULT_MOLMOACT2_URL = "http://192.168.0.233:8012"
+
+
+class PolicyRobotBackend(Protocol):
+    def get_joint_positions_q9(self) -> np.ndarray: ...
+
+    def apply_policy_joint_targets(self, q9: np.ndarray) -> None: ...
+
+
+class PolicyCameraBackend(Protocol):
+    def observations_ready(self, external_slot: str = "external_1", external_camera_mode: str = "single") -> bool: ...
+
+    def get_rgb(self, camera_id: str) -> np.ndarray | None: ...
+
+
 DEFAULT_MOLMOACT2_DUAL_URL = "http://192.168.0.233:8101"
 INFERENCE_TIMEOUT_S = 120.0
 CONTROL_HZ = 15.0
@@ -273,8 +286,8 @@ class MolmoAct2Controller:
 
     def __init__(
         self,
-        handler: IsaacMotionServerHandler,
-        camera_manager: CameraStreamManager,
+        handler: PolicyRobotBackend,
+        camera_manager: PolicyCameraBackend,
     ) -> None:
         self._handler = handler
         self._cameras = camera_manager
